@@ -20,12 +20,6 @@ const (
 	TaskStatusSkipped   TaskStatus = "skipped"
 )
 
-// TaskResult 表示任务执行的结果
-type TaskResult struct {
-	Data  interface{}
-	Error error
-}
-
 // Task 表示一个可执行的任务
 type Task struct {
 	ID        string
@@ -39,6 +33,32 @@ type Task struct {
 type TaskGraph struct {
 	graph      graph.Graph[string, *Task]
 	taskLayers map[string]int // 存储任务的层级
+	opts       *ExecuteOptions
+}
+
+// ExecuteOptions 定义执行配置
+type ExecuteOptions struct {
+	WorkerCount    int
+	EnableDebugLog bool
+}
+
+// ExecuteOption 定义执行选项的函数类型
+type ExecuteOption func(*ExecuteOptions)
+
+// WithWorkerCount 设置工作协程数
+func WithWorkerCount(count int) ExecuteOption {
+	return func(opts *ExecuteOptions) {
+		if count > 0 {
+			opts.WorkerCount = count
+		}
+	}
+}
+
+// WithDebugLog 启用调试日志
+func WithDebugLog(enable bool) ExecuteOption {
+	return func(opts *ExecuteOptions) {
+		opts.EnableDebugLog = enable
+	}
 }
 
 // NewTaskGraph 创建新的任务图
@@ -46,6 +66,10 @@ func NewTaskGraph() *TaskGraph {
 	return &TaskGraph{
 		graph:      graph.New(func(task *Task) string { return task.ID }, graph.Directed()),
 		taskLayers: make(map[string]int),
+		opts: &ExecuteOptions{
+			WorkerCount:    5,
+			EnableDebugLog: false,
+		},
 	}
 }
 
@@ -86,11 +110,6 @@ func (tg *TaskGraph) AddTask(task *Task) error {
 	}
 
 	return nil
-}
-
-// ExecuteOptions 定义执行选项
-type ExecuteOptions struct {
-	WorkerCount int
 }
 
 // executeLayer 执行单层任务并返回结果
@@ -145,15 +164,10 @@ func (tg *TaskGraph) executeLayer(ctx context.Context, layer []string, results m
 }
 
 // Execute 执行整个任务图
-func (tg *TaskGraph) Execute(ctx context.Context, opts ExecuteOptions) (map[string]interface{}, error) {
-	if opts.WorkerCount <= 0 {
-		opts.WorkerCount = 5
-	}
-
-	// 获取执行顺序
-	_, err := graph.TopologicalSort(tg.graph)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sort tasks: %v", err)
+func (tg *TaskGraph) Execute(ctx context.Context, options ...ExecuteOption) (map[string]interface{}, error) {
+	// Apply options
+	for _, option := range options {
+		option(tg.opts)
 	}
 
 	// 创建结果映射表
@@ -166,7 +180,10 @@ func (tg *TaskGraph) Execute(ctx context.Context, opts ExecuteOptions) (map[stri
 			maxLayer = layer
 		}
 	}
-	fmt.Println("task layers: ", tg.taskLayers)
+
+	if tg.opts.EnableDebugLog {
+		fmt.Println("task layers: ", tg.taskLayers)
+	}
 
 	// 按层级组织任务
 	layers := make([][]string, maxLayer+1)
@@ -174,7 +191,9 @@ func (tg *TaskGraph) Execute(ctx context.Context, opts ExecuteOptions) (map[stri
 		layers[layer] = append(layers[layer], taskID)
 	}
 
-	fmt.Println("layers: ", layers)
+	if tg.opts.EnableDebugLog {
+		fmt.Println("layers: ", layers)
+	}
 
 	// 按层次执行任务
 	for _, layer := range layers {

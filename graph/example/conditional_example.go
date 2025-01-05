@@ -114,10 +114,7 @@ func RunConditionalExample() {
 
 	// 执行任务图
 	ctx := context.Background()
-	opts := graph.ExecuteOptions{
-		WorkerCount: 3,
-	}
-	result, err := taskGraph.Execute(ctx, opts)
+	result, err := taskGraph.Execute(ctx, graph.WithWorkerCount(3))
 	if err != nil {
 		fmt.Printf("Execution failed: %v\n", err)
 		return

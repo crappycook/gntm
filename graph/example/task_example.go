@@ -108,11 +108,8 @@ func RunTaskExample() {
 
 	// 执行任务图
 	ctx := context.Background()
-	opts := graph.ExecuteOptions{
-		WorkerCount: 3, // 设置工作池大小
-	}
 
-	data, err := taskGraph.Execute(ctx, opts)
+	data, err := taskGraph.Execute(ctx, graph.WithWorkerCount(3), graph.WithDebugLog(true))
 	if err != nil {
 		fmt.Printf("Execution failed: %v\n", err)
 		return
