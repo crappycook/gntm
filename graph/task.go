@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/dominikbraun/graph"
@@ -114,7 +115,10 @@ func (tg *TaskGraph) AddTask(task *Task) error {
 
 // executeLayer 执行单层任务并返回结果
 func (tg *TaskGraph) executeLayer(ctx context.Context, layer []string, results map[string]interface{}) (map[string]interface{}, error) {
+	// 创建带并发限制的 errgroup
 	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(tg.opts.WorkerCount) // 设置并发限制
+
 	layerResults := make(map[string]interface{})
 	var layerMu sync.Mutex
 
@@ -182,7 +186,7 @@ func (tg *TaskGraph) Execute(ctx context.Context, options ...ExecuteOption) (map
 	}
 
 	if tg.opts.EnableDebugLog {
-		fmt.Println("task layers: ", tg.taskLayers)
+		log.Printf("task layers: %v", tg.taskLayers)
 	}
 
 	// 按层级组织任务
@@ -192,7 +196,7 @@ func (tg *TaskGraph) Execute(ctx context.Context, options ...ExecuteOption) (map
 	}
 
 	if tg.opts.EnableDebugLog {
-		fmt.Println("layers: ", layers)
+		log.Printf("layers: %v", layers)
 	}
 
 	// 按层次执行任务
